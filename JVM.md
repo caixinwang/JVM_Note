@@ -914,11 +914,9 @@ new一个对象的过程，开辟内存空间赋默认值了之后会先把内�
 
 ### 如何定位垃圾
 
-refrence count (RC) : 对象被引用了多少次，变为0就是垃圾。RC不能解决循环引用，A->B B->C C->A。
+1. refrence count (RC) : 对象被引用了多少次，变为0就是垃圾。RC不能解决循环引用，A->B B->C C->A。
 
-
-
-Root Serching （根可达算法）
+2. Root Serching （根可达算法）
 
 什么是根？
 
@@ -1036,6 +1034,8 @@ Survivor0和Survivor1是循环利用的，也就是说，在经过一次 Minor G
 4. 年龄足够 -> 老年代 （15 CMS 6）
 5. s区装不下 -> 老年代
 
+方法区Method Space是JVM虚拟机自带的一个概念，里面装的都是class的一些信息。Perm Generation以及Metaspace都是它的具体实现。
+
 ```
 新生代 + 老年代 + 永久代（1.7）Perm Generation/ 元数据区(1.8) Metaspace
 
@@ -1054,7 +1054,7 @@ Survivor0和Survivor1是循环利用的，也就是说，在经过一次 Minor G
 
 #### GC的概念
 
-老年代满了FGC Full GC。
+老年代满了触发FGC--- Full GC。
 
 应该尽量减少FGC。
 
@@ -1130,8 +1130,8 @@ age占4位，最大就是15了。
 
 ![image-20230514194314923](image/image-20230514194314923.png)
 
-1. JDK诞生 Serial追随 提高效率，诞生了PS，为了配合CMS，诞生了PN，CMS是1.4版本后期引入，CMS是里程碑式的GC，它开启了并发回收的过程，但是CMS毛病较多，因此目前任何一个JDK版本默认是CMS
-   并发垃圾回收是因为无法忍受STW
+1. JDK诞生 Serial追随 提高效率，诞生了PS，为了配合CMS，诞生了PN，CMS是1.4版本后期引入，CMS是里程碑式的GC，它开启了并发回收的过程，但是CMS毛病较多，因此目前没有任何一个JDK版本默认是CMS
+   并发垃圾回收是因为无法忍受STW--stop the world
 
    Serial--单线程。Parallel--多线程。
 
@@ -1244,22 +1244,24 @@ Parallel Old GC 是一种年老代垃圾收集器，属于并行垃圾收集器�
 
 #### ParNew
 
-ParNew是一种使用多线程执行垃圾回收的年轻代垃圾收集器，属于并行垃圾收集器的一种。它主要用于替代Serial收集器，可以在多CPU的环境下，实现更高的吞吐量。它采用复制算法来回收年轻代，将堆内存分为若干个线程私有的区域，每个区域中包含了一个Eden区和两个Survivor区，其中Eden区用于存放新生的对象，Survivor区用于存放存活的对象，通过不断地在Eden区和Survivor区之间移动对象，来实现垃圾回收的目的。在内存不足时，就会触发一次GC。ParNew垃圾收集器默认使用的是并行收集算法，可以通过参数调整来改变它的行为。
+ParNew是一种使用多线程执行垃圾回收的年轻代垃圾收集器，属于并行垃圾收集器的一种。它主要用于替代Serial收集器，可以在多CPU的环境下，实现更高的吞吐量。它采用复制算法来回收年轻代，将堆内存分为若干个线程私有的区域，每个区域中包含了一个Eden区和两个Survivor区（From、To），其中Eden区用于存放新生的对象，Survivor区用于存放存活的对象，通过不断地在Eden区和Survivor区之间移动对象，来实现垃圾回收的目的。在内存不足时，就会触发一次GC。ParNew垃圾收集器默认使用的是并行收集算法，可以通过参数调整来改变它的行为。
 
 和Parallel Scavenge的区别
 
 ```
-ParNew 和 Parallel Scavenge 都是基于并行的新生代垃圾收集器，它们的区别在于：
+Parallel Scavenge和Par New是两种不同的垃圾收集器算法，都是HotSpot JVM中用于内存管理的组件，具有一些区别。
 
-实现机制不同：ParNew 是基于 Serial GC 的，而 Parallel Scavenge 是独立实现的。
+目标不同：Parallel Scavenge的主要目标是通过最大化吞吐量来减少垃圾收集的停顿时间，适用于对吞吐量要求较高的应用程序。而Par New的主要目标是减少垃圾收集的停顿时间，适用于对低延迟要求较高的应用程序。
 
-收集方式不同：ParNew 和 Serial GC 一样，采用的是标记-复制算法，只不过它是并行的。而 Parallel Scavenge 采用的是标记-整理算法。
+适用范围不同：Parallel Scavenge主要用于应对具有大量可回收对象的应用程序，特别是那些具有高度可扩展性和低延迟要求的应用程序。而Par New主要用于年轻代的垃圾收集，是Parallel Scavenge的替代选择。
 
-目标不同：ParNew 更注重响应时间，因为它是用于配合老年代的 CMS 垃圾收集器的。而 Parallel Scavenge 更注重吞吐量，因为它是用于替代 Serial GC 和 Parallel Old 的。
+垃圾收集算法不同：Parallel Scavenge使用复制算法，在内存空间中划分出Eden区和Survivor区，并行复制存活对象。Par New也使用复制算法，但它只有一个Eden区和一个Survivor区，与Serial收集器类似。
 
-堆内存布局不同：ParNew 在堆内存布局上是基于标记-复制算法的，所以其新生代内存被分成 Eden 区、Survivor0 区和 Survivor1 区三个部分。而 Parallel Scavenge 在堆内存布局上是基于标记-整理算法的，所以其新生代内存被分成了一个可扩展的区域。
+并行度不同：Parallel Scavenge是一种并行收集器，使用多个线程并行执行垃圾收集操作，以提高收集效率。Par New也是一种并行收集器，但其并行度较低，通常使用少量的线程执行垃圾收集。
 
-总的来说，ParNew 更适合配合 CMS 垃圾收集器使用，提供短暂的响应时间；而 Parallel Scavenge 更适合用于大规模的数据中心，以提高系统的吞吐量。
+配置参数不同：Parallel Scavenge和Par New具有不同的垃圾收集器参数和调优选项，可以根据具体应用程序和系统环境的需求进行配置。
+
+总的来说，Parallel Scavenge和Par New是两种不同的垃圾收集器算法，适用于不同类型的应用程序和性能需求。Parallel Scavenge主要关注吞吐量，适用于大量可回收对象的高吞吐量应用程序，而Par New主要关注低延迟，适用于对停顿时间敏感的应用程序。
 ```
 
 ![image-20230514195929376](image/image-20230514195929376.png)
@@ -1288,7 +1290,25 @@ CMS（Concurrent Mark Sweep）是一种垃圾回收算法，旨在减少应用�
 
 CMS算法的优点是尽可能减少应用程序的停顿时间，它使用并发标记和并发清除来避免停顿时间，因此适用于对延迟敏感的应用程序。
 
-缺点是由于并发标记和并发清除在执行时与应用程序线程竞争CPU资源，可能会导致CMS算法产生更多的碎片，并且在内存不足的情况下会导致频繁的Full GC。由于算法 标记-清除 本身的原因，新的对象不能往老年代装了，CMS会把SerialOld请来做标记整理。
+```
+CMS（Concurrent Mark Sweep）是一种基于标记-清除（mark-sweep）算法的垃圾收集器，旨在减少垃圾收集的停顿时间。虽然CMS在某些方面具有一些优点，但也存在一些缺点：
+
+1. 内存碎片：CMS使用标记-清除算法，它不会进行内存的整理操作，因此容易产生内存碎片。这可能导致在分配较大对象时，由于内存碎片而无法找到足够的连续空间，从而触发一次Full GC（全局垃圾收集），引起较长的停顿时间。
+
+2. CPU资源占用：CMS是一种并发收集器，它在应用程序运行的同时执行垃圾收集操作。这意味着垃圾收集线程和应用程序线程会竞争CPU资源，可能导致应用程序的吞吐量降低。特别是在垃圾收集阶段，CMS会消耗较多的CPU资源，可能对应用程序的性能产生一定的影响。
+
+3. 需要更多的内存空间：CMS的工作方式需要额外的内存空间来存储标记信息和维护并发收集的状态。这可能导致整体内存占用增加，使得应用程序需要更多的堆空间才能正常运行。
+
+4. 无法处理浮动垃圾：CMS是一种并发收集器，它在垃圾收集过程中允许应用程序继续运行。这意味着在垃圾收集期间，应用程序可能会产生新的垃圾对象。由于CMS无法冻结应用程序状态，这些新产生的垃圾对象无法被及时收集，可能会导致垃圾对象的堆积，进而影响垃圾收集效率。
+
+5. 停顿时间仍存在：尽管CMS旨在减少垃圾收集的停顿时间，但由于它是一种并发收集器，无法完全消除停顿。在初始标记和最终标记阶段，以及进行清除操作时，CMS需要停止应用程序线程进行工作，这可能导致较短的停顿时间存在。
+
+综上所述，CMS虽然在降低垃圾收集停顿时间方面具有优势，但也存在一些缺点，如内存碎片、CPU资源占用、需要更多内存空间、无法处理浮动垃圾以及仍然存在一定的停顿时间。根据具体的应用场景和需求，
+
+可以考虑选择其他垃圾收集器来解决这些问题。
+```
+
+
 
 1. Memory Fragmentation
 
@@ -1310,6 +1330,26 @@ CMS算法的优点是尽可能减少应用程序的停顿时间，它使用并�
 
    92%的意思是，由于必须得预留一定的空间给浮动垃圾。所以它规定，一个预值这个预值默认是92%，指的是92%的时候就会产生FGC。这个可以小一下，让浮动垃圾这些更有弹性。
 
+   ```
+   Full GC（Full Garbage Collection）是一种垃圾收集器的执行过程，它的目标是对整个Java堆进行全面的垃圾收集。
+   
+   在Java虚拟机中，通常将堆内存划分为不同的代，如年轻代（Young Generation）和老年代（Old Generation）。年轻代通常由Eden区和Survivor区组成，而老年代则用于存放存活时间较长的对象。
+   
+   Full GC与局部垃圾收集（Partial GC）不同，它不仅仅是对某个特定的代进行垃圾收集，而是对整个堆内存进行扫描和清理，包括年轻代和老年代。
+   
+   Full GC通常在以下情况下触发：
+   
+   1. 当堆内存不足时：当应用程序需要分配新的对象，但无法找到足够的内存空间时，会触发Full GC。Full GC会尝试回收所有代中的垃圾对象，以释放更多的内存供应用程序使用。
+   
+   2. 显式调用：应用程序可以通过调用System.gc()方法来请求进行Full GC。但值得注意的是，这只是向虚拟机发送一个垃圾收集的建议，虚拟机是否执行Full GC取决于具体的实现和配置。
+   
+   Full GC的执行过程比局部垃圾收集更耗时，因为它需要扫描整个堆内存并处理所有代中的对象。在Full GC期间，应用程序的执行通常会暂停，导致较长的停顿时间。这对于对低延迟要求较高的应用程序来说可能是一个问题。
+   
+   由于Full GC可能会导致较长的停顿时间和较高的系统负载，所以在系统设计和调优中，尽量避免频繁触发Full GC是一个重要的考虑因素。通常，合理设置堆大小、垃圾收集器的参数以及优化应用程序的内存使用情况可以帮助减少Full GC的频率和停顿时间。
+   ```
+   
+   
+   
    ![image-20230514202141072](image/image-20230514202141072.png)
 
 
@@ -1326,7 +1366,43 @@ parallel叫并行，强调的是多个线程同时回收。
 
 ![image-20230514202632832](image/image-20230514202632832.png)
 
+```
+三色标记算法（Three-Color Marking Algorithm）是一种用于垃圾收集的算法，常用于并发标记-清除（concurrent mark-sweep）垃圾收集器中。它是基于追踪垃圾对象的可达性原理。
 
+三色标记算法基于以下三个颜色对垃圾对象进行标记：
+
+白色（White）：表示对象尚未被垃圾收集器扫描。初始时，所有对象都被假设为白色。
+
+灰色（Gray）：表示对象已经被垃圾收集器扫描，但其引用的对象尚未被扫描。灰色对象的引用仍然需要进一步扫描。
+
+黑色（Black）：表示对象及其引用的对象已经被垃圾收集器完全扫描。黑色对象被视为非垃圾对象。
+
+三色标记算法的基本流程如下：
+
+初始标记（Initial Mark）：从根对象（如全局变量、栈上对象等）出发，将根对象标记为灰色，然后沿着引用链追踪，将所有直接可达的对象标记为灰色。
+
+并发标记（Concurrent Mark）：在应用程序运行的同时，垃圾收集器并发地扫描灰色对象的引用，将引用的对象标记为灰色。这个过程会逐渐扩展可达性图。
+
+重新标记（Remark）：在并发标记阶段结束后，需要执行一次短暂的停顿，暂停应用程序的执行，以便完成对所有被修改的对象进行重新标记。这样可以保证在并发标记期间可能被修改的对象也能正确地标记为黑色。
+
+清除（Sweep）：根据标记结果，清除所有未被标记为黑色的对象，回收内存空间。
+
+通过三色标记算法，垃圾收集器可以并发地扫描和标记对象，减少了停顿时间。该算法在实现并发垃圾收集器时被广泛使用，例如CMS（Concurrent Mark Sweep）和G1（Garbage-First）等收集器。
+```
+
+```
+在 ParNew + CMS 组合中，Serial Old 是一个备选的垃圾收集器，用于在 CMS 收集器无法处理某些情况时进行回退。
+
+ParNew 是一个年轻代并行收集器，用于执行年轻代的垃圾收集。它主要用于配合 CMS 收集器使用，CMS 负责老年代的并发收集，而 ParNew 则负责年轻代的并行收集。
+
+CMS 收集器是一种以最小停顿时间为目标的垃圾收集器，它允许应用程序与垃圾收集器并发运行，以减少停顿时间。然而，CMS 在某些情况下可能会出现无法并发执行的情况，如以下情况：
+
+并发失败：当 CMS 收集器在垃圾收集过程中遇到并发失败的情况，例如老年代空间不足、晋升对象太多等，它会触发一次 Full GC（全局垃圾收集）。在这种情况下，为了确保内存回收，Serial Old 可以被用作备选的垃圾收集器来处理老年代的垃圾。
+
+CMS 初始化和结束阶段：CMS 收集器在初始化和结束阶段需要停止应用程序线程执行特定的操作，这些操作可能无法并发执行。在这些阶段，为了确保正常进行初始化和结束过程，Serial Old 可以用于执行相应的垃圾收集操作。
+
+总的来说，Serial Old 是 ParNew + CMS 组合中的备选垃圾收集器，用于处理 CMS 无法并发执行的情况，如并发失败、CMS 初始化和结束阶段。通过引入 Serial Old，可以保证在这些情况下仍能够进行有效的垃圾收集，并确保应用程序的正常执行。
+```
 
 
 
@@ -1450,6 +1526,8 @@ parallel叫并行，强调的是多个线程同时回收。
 ![image-20230515133550737](image/image-20230515133550737.png)
 
 产生了堆溢出之后，会打印如下。
+
+
 
 ```
 "Meta Space" 和 "Class Space" 都是 Java 虚拟机 (JVM) 中的内存区域，用于存储 Java 类和元数据信息。"Meta Space"它是 Java 虚拟机 (JVM) 中的一个独立的内存区域，与 Java 堆内存是分开的。
@@ -1629,3 +1707,175 @@ parallel叫并行，强调的是多个线程同时回收。
    2. 分析 (jhat jvisualvm mat jprofiler ... )
 4. 如何监控JVM
    1. jstat jvisualvm jprofiler arthas top...
+
+### 解决JVM运行中的问题
+
+#### 一个案例理解常用工具
+
+1. 测试代码：
+
+   ```java
+   package com.mashibing.jvm.gc;
+   
+   import java.math.BigDecimal;
+   import java.util.ArrayList;
+   import java.util.Date;
+   import java.util.List;
+   import java.util.concurrent.ScheduledThreadPoolExecutor;
+   import java.util.concurrent.ThreadPoolExecutor;
+   import java.util.concurrent.TimeUnit;
+   
+   /**
+    * 从数据库中读取信用数据，套用模型，并把结果进行记录和传输
+    */
+   
+   public class T15_FullGC_Problem01 {
+   
+       private static class CardInfo {
+           BigDecimal price = new BigDecimal(0.0);
+           String name = "张三";
+           int age = 5;
+           Date birthdate = new Date();
+   
+           public void m() {}
+       }
+   
+       private static ScheduledThreadPoolExecutor executor = new ScheduledThreadPoolExecutor(50,
+               new ThreadPoolExecutor.DiscardOldestPolicy());
+   
+       public static void main(String[] args) throws Exception {
+           executor.setMaximumPoolSize(50);
+   
+           for (;;){
+               modelFit();
+               Thread.sleep(100);
+           }
+       }
+   
+       private static void modelFit(){
+           List<CardInfo> taskList = getAllCardInfo();
+           taskList.forEach(info -> {
+               // do something
+               executor.scheduleWithFixedDelay(() -> {
+                   //do sth with info
+                   info.m();
+   
+               }, 2, 3, TimeUnit.SECONDS);
+           });
+       }
+   
+       private static List<CardInfo> getAllCardInfo(){
+           List<CardInfo> taskList = new ArrayList<>();
+   
+           for (int i = 0; i < 100; i++) {
+               CardInfo ci = new CardInfo();
+               taskList.add(ci);
+           }
+   
+           return taskList;
+       }
+   }
+   
+   ```
+
+2. java -Xms200M -Xmx200M -XX:+PrintGC com.mashibing.jvm.gc.T15_FullGC_Problem01
+
+3. 一般是运维团队首先受到报警信息（CPU Memory）
+
+4. top命令观察到问题：内存不断增长 CPU占用率居高不下
+
+5. top -Hp (具体的pid)   观察进程中的线程，哪个线程CPU和内存占比高.
+
+   某些线程占的比较高的时候，这个例子最终会是垃圾回收的线程，占的CPU占的非常高，因为它垃圾回收不过来了
+
+   实际非常有可能是你的每一根业务逻辑线程它占比非常高。用jstack + pid，它会把这个进程下面所有的线程都列出来。里面会有每一个线程的线程id，以及状态，这个状态很重要。如果发现很多的线程长时间的block、长时间的wait，这个程序就说明他很可能有问题。
+
+6. jps定位具体java进程
+   jstack 定位线程状况，重点关注：WAITING BLOCKED
+   eg.
+   waiting on <0x0000000088ca3310> (a java.lang.Object)    正在等待这把锁释放
+   假如有一个进程中100个线程，很多线程都在waiting on <xx> ，一定要找到是哪个线程持有这把锁
+   怎么找？搜索jstack dump的信息，找<xx> ，看哪个线程持有这把锁RUNNABLE
+   作业：1：写一个死锁程序，用jstack观察 2 ：写一个程序，一个线程持有锁不释放，其他线程等待
+
+7. 为什么阿里规范里规定，线程的名称（尤其是线程池）都要写有意义的名称
+   怎么样自定义线程池里的线程名称？（自定义ThreadFactory）
+
+8. jinfo pid 
+
+9. jstat -gc 动态观察gc情况 / 阅读GC日志发现频繁GC / arthas观察 / jconsole/jvisualVM/ Jprofiler（最好用）
+   jstat -gc 4655 500 : 每个500个毫秒打印GC的情况
+   如果面试官问你是怎么定位OOM问题的？如果你回答用图形界面（错误）---你jmx远程监控对于你服务器性能的影响还挺高的。那么你牛批吹出去了，你不用图形化界面怎么找到问题出在哪？如果我能找到堆内存里到底是哪些个对象占的特别多？我基本上就能够找到问题出在哪儿。尤其是我观察一段时间之后，发现它越来越多垃收回收不掉，一定是这些个对象相关的代码出了问题才对。------jmap命令
+   1：已经上线的系统不用图形界面用什么？（cmdline arthas）
+   2：图形界面到底用在什么地方？测试！测试的时候进行监控！（压测观察）
+
+10. jmap - histo 4655 | head -20，查找有多少对象产生
+
+11. jmap -dump:format=b,file=xxx pid ：
+
+    线上系统，内存特别大，jmap导出堆存储文件执行期间会对进程产生很大影响，甚至卡顿（电商不适合）
+    1：设定了参数HeapDump，OOM的时候会自动产生堆转储文件
+    2：<font color='red'>很多服务器备份（高可用），停掉这台服务器对其他服务器不影响</font>
+    3：在线定位(一般小点儿公司用不到)
+
+12. java -Xms20M -Xmx20M -XX:+UseParallelGC -XX:+HeapDumpOnOutOfMemoryError com.mashibing.jvm.gc.T15_FullGC_Problem01
+
+13. 使用MAT / jhat /jvisualvm 进行dump文件分析
+     https://www.cnblogs.com/baihuitestsoftware/articles/6406271.html 
+    jhat -J-mx512M xxx.dump
+    http://192.168.17.11:7000
+    拉到最后：找到对应链接
+    可以使用OQL查找特定问题对象
+
+14. 找到代码的问题
+
+#### jconsole远程连接
+
+要连接上需要在远程把jmx打开。
+
+1. 程序启动加入参数：
+
+   > ```shell
+   > java -Djava.rmi.server.hostname=192.168.17.11 -Dcom.sun.management.jmxremote -Dcom.sun.management.jmxremote.port=11111 -Dcom.sun.management.jmxremote.authenticate=false -Dcom.sun.management.jmxremote.ssl=false XXX
+   > ```
+
+2. 如果遭遇 Local host name unknown：XXX的错误，修改/etc/hosts文件，把XXX加入进去
+
+   > ```java
+   > 192.168.17.11 basic localhost localhost.localdomain localhost4 localhost4.localdomain4
+   > ::1         localhost localhost.localdomain localhost6 localhost6.localdomain6
+   > ```
+
+3. 关闭linux防火墙（实战中应该打开对应端口）
+
+   > ```shell
+   > service iptables stop
+   > chkconfig iptables off #永久关闭
+   > ```
+
+4. windows上打开 jconsole远程连接 192.168.17.11:11111
+
+#### jvisualvm远程连接
+
+ https://www.cnblogs.com/liugh/p/7620336.html （简单做法）
+
+#### jprofiler (收费)
+
+#### arthas在线排查工具
+
+* 为什么需要在线排查？
+  在生产上我们经常会碰到一些不好排查的问题，例如线程安全问题，用最简单的threaddump或者heapdump不好查到问题原因。为了排查这些问题，有时我们会临时加一些日志，比如在一些关键的函数里打印出入参，然后重新打包发布，如果打了日志还是没找到问题，继续加日志，重新打包发布。对于上线流程复杂而且审核比较严的公司，从改代码到上线需要层层的流转，会大大影响问题排查的进度。 
+* jvm观察jvm信息
+* thread定位线程问题
+* dashboard 观察系统情况
+* heapdump + jhat分析
+* jad反编译
+  动态代理生成类的问题定位
+  第三方的类（观察代码）
+  版本问题（确定自己最新提交的版本是不是被使用）
+* redefine 热替换
+  目前有些限制条件：只能改方法实现（方法已经运行完成），不能改方法名， 不能改属性
+  m() -> mm()
+* sc  - search class
+* watch  - watch method
+* 没有包含的功能：jmap
