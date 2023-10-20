@@ -1406,6 +1406,10 @@ CMS 初始化和结束阶段：CMS 收集器在初始化和结束阶段需要停
 
 
 
+#### 总结
+
+
+
 ### 常见垃圾回收器组合参数设定：(1.8)
 
 * -XX:+UseSerialGC = Serial New (DefNew) + Serial Old
